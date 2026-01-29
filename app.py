@@ -1,5 +1,5 @@
 import MetaTrader5 as mt5
-from src.utils.configs import settings 
+from src.config.settings import settings 
 import sys
 
 print("🔄 Iniciando teste com Pydantic v2...")
