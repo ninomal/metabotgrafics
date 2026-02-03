@@ -1,40 +1,43 @@
-import MetaTrader5 as mt5
-from src.config.settings import settings 
+import asyncio
+import logging
 import sys
+from src.main import TradingBot
 
-print("🔄 Iniciando teste com Pydantic v2...")
-print(f"📂 Caminho configurado: {settings.MT5_PATH}")
-print(f"👤 Conta configurada: {settings.MT5_LOGIN}")
-
-# Inicializa usando os dados validados pelo Pydantic
-if not mt5.initialize(path=settings.MT5_PATH):
-    print("❌ Falha na inicialização com caminho específico. Tentando padrão...")
-    if not mt5.initialize():
-        print("❌ Erro crítico no MT5:", mt5.last_error())
-        sys.exit()
-
-# Login explícito (opcional, mas bom para garantir que é a conta do .env)
-# O Pydantic garante que settings.MT5_LOGIN é um número (int), então não precisamos converter
-authorized = mt5.login(
-    settings.MT5_LOGIN, 
-    password=settings.MT5_PASSWORD, 
-    server=settings.MT5_SERVER
+# Configure Logging (To see what's happening in the console)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO
 )
+logger = logging.getLogger(__name__)
 
-if authorized:
-    print(f"✅ Login autorizado na conta {settings.MT5_LOGIN}")
-    account_info = mt5.account_info()
-    print(f"💰 Saldo Atual: {account_info.balance}")
+async def run_application():
+    """
+    Entry point for the Async Application.
+    """
+    logger.info("🚀 Starting Trading Bot Application...")
     
-    # Teste do Símbolo
-    symbol = settings.SYMBOL
-    selected = mt5.symbol_select(symbol, True) # Garante que está visível no Market Watch
-    if not selected:
-        print(f"⚠️ Erro: Não foi possível selecionar o par {symbol}")
-    else:
-        tick = mt5.symbol_info_tick(symbol)
-        print(f"📊 Cotação {symbol}: Compra {tick.ask} / Venda {tick.bid}")
-else:
-    print(f"❌ Falha no login: {mt5.last_error()}")
+    # Instantiate the Main Bot Orchestrator
+    bot = TradingBot()
+    
+    try:
+        # Start the main loop
+        await bot.start()
+    except KeyboardInterrupt:
+        logger.warning("🛑 User stopped the application (Ctrl+C).")
+    except Exception as e:
+        logger.error(f"❌ Critical Error: {e}")
+    finally:
+        # Graceful Shutdown
+        logger.info("💤 Shutting down services...")
+        bot.stop()
+        sys.exit(0)
 
-mt5.shutdown()
+if __name__ == "__main__":
+    try:
+        # Windows specific event loop policy (avoids common errors on Windows)
+        if sys.platform.startswith("win"):
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+            
+        asyncio.run(run_application())
+    except KeyboardInterrupt:
+        pass
