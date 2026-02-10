@@ -59,3 +59,20 @@ class MT5Service:
             return None
             
         return rates
+    
+
+    def get_available_symbols(self):
+        """
+        Retrieves a list of all available symbol names from MT5.
+        Returns: list[str]
+        """
+        if not self.connected:
+            self.initialize()
+        
+        # Fetch all symbols
+        symbols_info = mt5.symbols_get()
+        
+        if symbols_info:
+            # Extract just the name using list comprehension
+            return [s.name for s in symbols_info]
+        return []

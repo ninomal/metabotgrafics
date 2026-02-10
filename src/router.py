@@ -76,3 +76,12 @@ async def get_chart_data():
         })
 
     return data_list
+
+@router.get("/symbols", response_model=List[str])
+async def get_all_symbols():
+    """
+    Endpoint to retrieve all available symbols from the broker.
+    Delegates to the MT5 Service.
+    """
+    return global_bot.mt5_service.get_available_symbols()
+
