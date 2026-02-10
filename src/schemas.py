@@ -7,3 +7,12 @@ class BotStatusResponse(BaseModel):
 class ActionResponse(BaseModel):
     status: str
     message: str
+
+
+class CandleResponse(BaseModel):
+    time: int       # Timestamp (Unix)
+    open: float
+    high: float
+    low: float
+    close: float
+    tick_volume: int
