@@ -74,3 +74,44 @@ async def get_chart_data(symbol: Optional[str] = Query(None)): # <--- MUDANÇA C
     )
 
     return candles
+
+# ---  TELEGRAM ENDPOINT ---
+@router.post("/telegram_test", response_model=ActionResponse)
+async def send_telegram_alert():
+    """
+    Captures a full-screen screenshot and sends it to the configured Telegram chat.
+    This is asynchronous to prevent blocking the main thread.
+    """
+    # 1. Check if the service is initialized and has a token
+    if not global_bot.telegram_service.bot:
+        return {
+            "success": False, 
+            "message": "Telegram credentials not configured in .env"
+        }
+
+    try:
+        # 2. Send a text notification first
+        status_text = "RUNNING" if global_bot.running else "STOPPED"
+        await global_bot.telegram_service.send_message(
+            f"📸 **Screenshot Requested!**\n"
+            f"Asset: {settings.SYMBOL}\n"
+            f"Bot Status: {status_text}"
+        )
+
+        # 3. Capture and send the screenshot (Async upload)
+        # We assume you implemented send_screenshot in the service as discussed
+        await global_bot.telegram_service.send_screenshot(
+            caption=f"Current Chart: {settings.SYMBOL}"
+        )
+
+        return {
+            "success": True, 
+            "message": "Screenshot sent to Telegram successfully!"
+        }
+
+    except Exception as e:
+        print(f"❌ Error sending to Telegram: {e}")
+        return {
+            "success": False, 
+            "message": f"Failed to send: {str(e)}"
+        }
