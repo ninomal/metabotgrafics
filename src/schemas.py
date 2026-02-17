@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional, List
 
 class BotStatusResponse(BaseModel):
     is_running: bool
@@ -16,3 +17,6 @@ class CandleResponse(BaseModel):
     low: float
     close: float
     tick_volume: int
+    color: Optional[str] = None
+    wickColor: Optional[str] = None
+    borderColor: Optional[str] = None

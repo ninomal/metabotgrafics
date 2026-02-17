@@ -58,43 +58,65 @@ class MT5Service:
 
     def get_candles(self, symbol: str, timeframe, num_candles: int = 100):
         """
-        Fetches historical candles (rates) from MT5 and converts them to a list of dictionaries.
-        
-        Args:
-            symbol (str): The asset symbol (e.g., "EURUSD").
-            timeframe: MT5 timeframe constant (e.g., mt5.TIMEFRAME_M5).
-            num_candles (int): Number of past candles to retrieve.
+        Fetches candles and applies VSA (Volume Spread Analysis) logic.
+        - Normal Volume: Standard Green/Red (Opaque)
+        - High Volume (Flow): Neon Green/Red (Bright)
         """
         if not self.connected:
             self.initialize()
 
-        # IMPORTANT: Ensure symbol is selected in Market Watch
-        # The second argument 'True' forces the symbol to be enabled
         if not mt5.symbol_select(symbol, True):
-            print(f"⚠️ Symbol {symbol} not found or could not be selected.")
+            print(f"⚠️ Symbol {symbol} not found.")
             return []
         
-        # Get candles from current time backwards
         rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, num_candles)
         
         if rates is None or len(rates) == 0:
-            print(f"⚠️ No data retrieved for {symbol}")
             return []
-            
-        # Convert Numpy Array to List of Dictionaries (JSON friendly)
+
+        # 1. Calculate Average Volume
+        total_volume = sum(r['tick_volume'] for r in rates)
+        avg_volume = total_volume / len(rates)
+        
+        # --- REAL VSA LOGIC ---
+        # Highlights only volumes 50% above the average (1.5x)
+        flow_threshold = avg_volume * 1.5 
+        
         data_list = []
         for rate in rates:
+            close = float(rate['close'])
+            open_price = float(rate['open'])
+            volume = int(rate['tick_volume'])
+            
+            # 1. Default Colors (Standard Volume - Opaque)
+            # Bullish: #22c55e | Bearish: #ef4444
+            color = '#22c55e' if close >= open_price else '#ef4444'
+            
+            # 2. Flow Logic (Big Player Detected)
+            if volume > flow_threshold:
+                if close >= open_price:
+                    # STRONG BUY FLOW (Neon Green)
+                    color = '#00FF00' 
+                else:
+                    # STRONG SELL FLOW (Neon Red)
+                    color = '#FF0040' 
+
+            # Send all data to the Frontend
             data_list.append({
                 "time": int(rate['time']),
-                "open": float(rate['open']),
+                "open": open_price,
                 "high": float(rate['high']),
                 "low": float(rate['low']),
-                "close": float(rate['close']),
-                "tick_volume": int(rate['tick_volume'])
+                "close": close,
+                "tick_volume": volume,
+                # Dynamic Colors
+                "color": color,
+                "wickColor": color,
+                "borderColor": color
             })
 
         return data_list
-
+        
     def get_symbol_price(self, symbol: str):
         """Gets the current Ask/Bid price for a symbol."""
         if not self.connected:
