@@ -58,9 +58,11 @@ class MT5Service:
 
     def get_candles(self, symbol: str, timeframe, num_candles: int = 100):
         """
-        Fetches candles and applies VSA (Volume Spread Analysis) logic.
-        - Normal Volume: Standard Green/Red (Opaque)
-        - High Volume (Flow): Neon Green/Red (Bright)
+        Fetches candles, applies VSA, and detects V-Shape Patterns.
+        Filters:
+        1. VSA Threshold: 1.5x Average Volume.
+        2. V-Shape Cooldown: Must wait 3 candles between patterns.
+        3. V-Shape Size: Candle must be larger than the average body size (no noise).
         """
         if not self.connected:
             self.initialize()
@@ -74,45 +76,83 @@ class MT5Service:
         if rates is None or len(rates) == 0:
             return []
 
-        # 1. Calculate Average Volume
+        # 1. Calculate Average Volume (for VSA)
         total_volume = sum(r['tick_volume'] for r in rates)
         avg_volume = total_volume / len(rates)
-        
-        # --- REAL VSA LOGIC ---
-        # Highlights only volumes 50% above the average (1.5x)
         flow_threshold = avg_volume * 1.5 
+
+        # 2. Calculate Average Body Size (for Volatility Filter)
+        # We need this to avoid marking tiny candles as patterns
+        total_body_size = sum(abs(r['open'] - r['close']) for r in rates)
+        avg_body_size = total_body_size / len(rates)
         
         data_list = []
-        for rate in rates:
+        
+        # Track the index of the last detected pattern to enforce the "3 candle rule"
+        last_pattern_index = -10 
+        
+        for i in range(len(rates)):
+            rate = rates[i]
+            
             close = float(rate['close'])
             open_price = float(rate['open'])
+            high = float(rate['high'])
+            low = float(rate['low'])
             volume = int(rate['tick_volume'])
             
-            # 1. Default Colors (Standard Volume - Opaque)
-            # Bullish: #22c55e | Bearish: #ef4444
+            # --- Default Colors ---
             color = '#22c55e' if close >= open_price else '#ef4444'
             
-            # 2. Flow Logic (Big Player Detected)
+            # --- VSA Logic ---
             if volume > flow_threshold:
                 if close >= open_price:
-                    # STRONG BUY FLOW (Neon Green)
                     color = '#00FF00' 
                 else:
-                    # STRONG SELL FLOW (Neon Red)
                     color = '#FF0040' 
 
-            # Send all data to the Frontend
+            # --- V-SHAPE PATTERN LOGIC (Filtered) ---
+            pattern_name = None 
+            
+            # Rule 1: Must have a previous candle
+            # Rule 2: COOLDOWN - Ensure 3 candles passed since last pattern
+            if i > 0 and (i - last_pattern_index) >= 3:
+                
+                prev_rate = rates[i-1]
+                prev_open = float(prev_rate['open'])
+                prev_close = float(prev_rate['close'])
+                
+                # Check Direction: Red then Green
+                is_prev_bearish = prev_close < prev_open
+                is_curr_bullish = close > open_price
+                
+                if is_prev_bearish and is_curr_bullish:
+                    prev_body = prev_open - prev_close
+                    curr_body = close - open_price
+                    
+                    # Rule 3: VOLATILITY FILTER
+                    # The previous drop must be at least the size of an average candle.
+                    # This ignores tiny noise.
+                    if prev_body > avg_body_size:
+                        
+                        # Rule 4: Strong Recovery (>80%)
+                        if curr_body >= (prev_body * 0.8):
+                            pattern_name = "V_SHAPE"
+                            color = '#FF00FF' # Hot Pink
+                            
+                            # Update the tracker so we don't mark the next few candles
+                            last_pattern_index = i 
+
             data_list.append({
                 "time": int(rate['time']),
                 "open": open_price,
-                "high": float(rate['high']),
-                "low": float(rate['low']),
+                "high": high,
+                "low": low,
                 "close": close,
                 "tick_volume": volume,
-                # Dynamic Colors
                 "color": color,
                 "wickColor": color,
-                "borderColor": color
+                "borderColor": color,
+                "pattern": pattern_name 
             })
 
         return data_list
