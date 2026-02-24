@@ -81,6 +81,7 @@ class MT5Service:
         avg_volume = total_volume / len(rates)
         flow_threshold = avg_volume * 1.5 
 
+
         # 2. Calculate Average Body Size (for Volatility Filter)
         # We need this to avoid marking tiny candles as patterns
         total_body_size = sum(abs(r['open'] - r['close']) for r in rates)
@@ -109,6 +110,17 @@ class MT5Service:
                     color = '#00FF00' 
                 else:
                     color = '#FF0040' 
+
+
+            #--- SMA LOGIC ---
+            sma_period = 20
+            data_list = []
+
+            sma_value = None
+            if i >= sma_period - 1:
+                # sum last 'sma_period' bid closed
+                subset = rates[i - (sma_period - 1) : i + 1]
+                sma_value = sum(r['close'] for r in subset) / sma_period
 
             # --- V-SHAPE PATTERN LOGIC (Filtered) ---
             pattern_name = None 
@@ -142,6 +154,8 @@ class MT5Service:
                             # Update the tracker so we don't mark the next few candles
                             last_pattern_index = i 
 
+            
+
             data_list.append({
                 "time": int(rate['time']),
                 "open": open_price,
@@ -152,7 +166,8 @@ class MT5Service:
                 "color": color,
                 "wickColor": color,
                 "borderColor": color,
-                "pattern": pattern_name 
+                "pattern": pattern_name,
+                "sma": sma_value 
             })
 
         return data_list

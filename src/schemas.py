@@ -20,6 +20,5 @@ class CandleResponse(BaseModel):
     color: Optional[str] = None
     wickColor: Optional[str] = None
     borderColor: Optional[str] = None
-
-    # NEW FIELD: Pattern Identifier (e.g., "V_SHAPE")
     pattern: Optional[str] = None
+    sma: Optional[float] = None
