@@ -92,6 +92,10 @@ class MT5Service:
         # Track the index of the last detected pattern to enforce the "3 candle rule"
         last_pattern_index = -10 
         
+        #sma varabiables
+        sma_period = 20
+        data_list = []
+
         for i in range(len(rates)):
             rate = rates[i]
             
@@ -113,8 +117,7 @@ class MT5Service:
 
 
             #--- SMA LOGIC ---
-            sma_period = 20
-            data_list = []
+           
 
             sma_value = None
             if i >= sma_period - 1:
